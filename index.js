@@ -1,234 +1,391 @@
-const express = require("express");
+const empresas = [];
 
-const app = express();
+function parseBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
 
-app.use(express.urlencoded({ extended: true }));
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
 
-let fornecedores = [];
-let logado = false;
+    req.on("end", () => {
+      const dados = {};
+      const partes = body.split("&");
 
-function menu() {
+      for (let i = 0; i < partes.length; i++) {
+        const item = partes[i].split("=");
+        const chave = decodeURIComponent(item[0] || "").replace(/\+/g, " ");
+        const valor = decodeURIComponent(item[1] || "").replace(/\+/g, " ");
+        dados[chave] = valor;
+      }
+
+      resolve(dados);
+    });
+  });
+}
+
+function parseCookies(req) {
+  const cookies = {};
+  const cookieHeader = req.headers.cookie || "";
+  const lista = cookieHeader.split(";");
+
+  for (let i = 0; i < lista.length; i++) {
+    const partes = lista[i].trim().split("=");
+    if (partes[0]) {
+      cookies[partes[0]] = partes[1];
+    }
+  }
+
+  return cookies;
+}
+
+function layout(titulo, conteudo) {
   return `
-    <a href="/">Home</a> |
-    <a href="/cadastroFornecedor">Cadastro de Fornecedor</a> |
-    <a href="/login">Login</a> |
-    <a href="/logout">Logout</a>
-    <hr>
+  <!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <title>${titulo}</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f4f4f4;
+      }
+
+      nav {
+        background: #333;
+        padding: 15px;
+      }
+
+      nav a {
+        color: white;
+        text-decoration: none;
+        margin-right: 15px;
+      }
+
+      .container {
+        width: 90%;
+        max-width: 900px;
+        margin: 20px auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+      }
+
+      h1, h2 {
+        margin-top: 0;
+      }
+
+      input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        box-sizing: border-box;
+      }
+
+      button {
+        padding: 10px 15px;
+        cursor: pointer;
+      }
+
+      .erro {
+        color: red;
+        margin-bottom: 15px;
+      }
+
+      .sucesso {
+        color: green;
+        margin-bottom: 15px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      table, th, td {
+        border: 1px solid #ccc;
+      }
+
+      th, td {
+        padding: 8px;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/cliente">Cadastro de Cliente</a>
+      <a href="/fornecedor">Cadastro de Fornecedor</a>
+      <a href="/login">Login</a>
+      <a href="/logout">Logout</a>
+    </nav>
+
+    <div class="container">
+      ${conteudo}
+    </div>
+  </body>
+  </html>
   `;
 }
 
 function paginaHome() {
-  return `
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Home</title>
-      </head>
-      <body>
-        ${menu()}
-        <h1>Home</h1>
-        <p>Bem-vindo ao sistema</p>
-      </body>
-    </html>
-  `;
+  return layout(
+    "Home",
+    `
+      <h1>Sistema Simples</h1>
+      <p>Bem-vindo ao sistema.</p>
+      <p>Use o menu para navegar entre as páginas.</p>
+    `
+  );
+}
+
+function paginaCliente() {
+  return layout(
+    "Cliente",
+    `
+      <h1>Cadastro de Cliente</h1>
+      <p>Página apenas para constar no menu.</p>
+    `
+  );
 }
 
 function paginaLogin(mensagem) {
+  return layout(
+    "Login",
+    `
+      <h1>Login</h1>
+      ${mensagem ? <p class="${mensagem.tipo}">${mensagem.texto}</p> : ""}
+      <form method="POST" action="/login">
+        <label>Usuário</label>
+        <input type="text" name="usuario">
+
+        <label>Senha</label>
+        <input type="password" name="senha">
+
+        <button type="submit">Entrar</button>
+      </form>
+
+      <p><strong>Usuário de teste:</strong> admin</p>
+      <p><strong>Senha de teste:</strong> 123</p>
+    `
+  );
+}
+
+function tabelaEmpresas() {
+  if (empresas.length === 0) {
+    return "<p>Nenhuma empresa cadastrada ainda.</p>";
+  }
+
+  let linhas = "";
+
+  for (let i = 0; i < empresas.length; i++) {
+    linhas += `
+      <tr>
+        <td>${empresas[i].cnpj}</td>
+        <td>${empresas[i].razaoSocial}</td>
+        <td>${empresas[i].nomeFantasia}</td>
+        <td>${empresas[i].cidade}</td>
+        <td>${empresas[i].uf}</td>
+        <td>${empresas[i].email}</td>
+        <td>${empresas[i].telefone}</td>
+      </tr>
+    `;
+  }
+
   return `
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Login</title>
-      </head>
-      <body>
-        ${menu()}
-        <h1>Login</h1>
-        <p>${mensagem || ""}</p>
-
-        <form method="POST" action="/login">
-          <label>Usuário:</label><br>
-          <input type="text" name="usuario"><br><br>
-
-          <label>Senha:</label><br>
-          <input type="password" name="senha"><br><br>
-
-          <button type="submit">Entrar</button>
-        </form>
-      </body>
-    </html>
+    <table>
+      <tr>
+        <th>CNPJ</th>
+        <th>Razão Social</th>
+        <th>Nome Fantasia</th>
+        <th>Cidade</th>
+        <th>UF</th>
+        <th>Email</th>
+        <th>Telefone</th>
+      </tr>
+      ${linhas}
+    </table>
   `;
 }
 
-function listaFornecedores() {
-  let lista = "<h2>Fornecedores cadastrados</h2>";
-
-  if (fornecedores.length === 0) {
-    lista += "<p>Nenhum fornecedor cadastrado.</p>";
-  } else {
-    lista += "<ul>";
-    for (let i = 0; i < fornecedores.length; i++) {
-      lista += `
-        <li>
-          ${fornecedores[i].cnpj} -
-          ${fornecedores[i].razaoSocial} -
-          ${fornecedores[i].nomeFantasia}
-        </li>
-      `;
-    }
-    lista += "</ul>";
-  }
-
-  return lista;
-}
-
-function paginaCadastroFornecedor(mensagem, erros, dados) {
+function paginaFornecedor(mensagem, dados) {
   dados = dados || {};
-  erros = erros || [];
 
-  let listaErros = "";
-  if (erros.length > 0) {
-    listaErros = "<ul>";
-    for (let i = 0; i < erros.length; i++) {
-      listaErros += <li>${erros[i]}</li>;
-    }
-    listaErros += "</ul>";
-  }
+  return layout(
+    "Cadastro de Fornecedor",
+    `
+      <h1>Cadastro de Fornecedor</h1>
+      ${mensagem ? <p class="${mensagem.tipo}">${mensagem.texto}</p> : ""}
 
-  return `
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Cadastro de Fornecedor</title>
-      </head>
-      <body>
-        ${menu()}
-        <h1>Cadastro de Fornecedor</h1>
+      <form method="POST" action="/fornecedor">
+        <label>CNPJ</label>
+        <input type="text" name="cnpj" value="${dados.cnpj || ""}">
 
-        <p>${mensagem || ""}</p>
-        ${listaErros}
+        <label>Razão Social ou Nome do Fornecedor</label>
+        <input type="text" name="razaoSocial" value="${dados.razaoSocial || ""}">
 
-        <form method="POST" action="/cadastroFornecedor">
-          <label>CNPJ:</label><br>
-          <input type="text" name="cnpj" value="${dados.cnpj || ""}"><br><br>
+        <label>Nome Fantasia</label>
+        <input type="text" name="nomeFantasia" value="${dados.nomeFantasia || ""}">
 
-          <label>Razão Social ou Nome do Fornecedor:</label><br>
-          <input type="text" name="razaoSocial" value="${dados.razaoSocial || ""}"><br><br>
+        <label>Endereço</label>
+        <input type="text" name="endereco" value="${dados.endereco || ""}">
 
-          <label>Nome fantasia:</label><br>
-          <input type="text" name="nomeFantasia" value="${dados.nomeFantasia || ""}"><br><br>
+        <label>Cidade</label>
+        <input type="text" name="cidade" value="${dados.cidade || ""}">
 
-          <label>Endereço:</label><br>
-          <input type="text" name="endereco" value="${dados.endereco || ""}"><br><br>
+        <label>UF</label>
+        <input type="text" name="uf" value="${dados.uf || ""}">
 
-          <label>Cidade:</label><br>
-          <input type="text" name="cidade" value="${dados.cidade || ""}"><br><br>
+        <label>CEP</label>
+        <input type="text" name="cep" value="${dados.cep || ""}">
 
-          <label>UF:</label><br>
-          <input type="text" name="uf" value="${dados.uf || ""}"><br><br>
+        <label>Email</label>
+        <input type="text" name="email" value="${dados.email || ""}">
 
-          <label>CEP:</label><br>
-          <input type="text" name="cep" value="${dados.cep || ""}"><br><br>
+        <label>Telefone</label>
+        <input type="text" name="telefone" value="${dados.telefone || ""}">
 
-          <label>Email:</label><br>
-          <input type="text" name="email" value="${dados.email || ""}"><br><br>
+        <button type="submit">Cadastrar</button>
+      </form>
 
-          <label>Telefone:</label><br>
-          <input type="text" name="telefone" value="${dados.telefone || ""}"><br><br>
-
-          <button type="submit">Cadastrar</button>
-        </form>
-
-        ${listaFornecedores()}
-      </body>
-    </html>
-  `;
+      <h2>Empresas cadastradas</h2>
+      ${tabelaEmpresas()}
+    `
+  );
 }
 
-app.get("/", function (req, res) {
-  res.send(paginaHome());
-});
+module.exports = async (req, res) => {
+  const url = req.url.split("?")[0];
+  const metodo = req.method;
+  const cookies = parseCookies(req);
 
-app.get("/login", function (req, res) {
-  res.send(paginaLogin(""));
-});
-
-app.post("/login", function (req, res) {
-  const dados = req.body;
-
-  if (dados.usuario === "admin" && dados.senha === "123") {
-    logado = true;
-    res.send(paginaLogin("Login realizado com sucesso"));
-  } else {
-    logado = false;
-    res.send(paginaLogin("Usuário ou senha inválidos"));
-  }
-});
-
-app.get("/logout", function (req, res) {
-  logado = false;
-  res.send(`
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Logout</title>
-      </head>
-      <body>
-        ${menu()}
-        <h1>Logout</h1>
-        <p>Logout efetuado com sucesso!</p>
-      </body>
-    </html>
-  `);
-});
-
-app.get("/cadastroFornecedor", function (req, res) {
-  res.send(paginaCadastroFornecedor("", [], {}));
-});
-
-app.post("/cadastroFornecedor", function (req, res) {
-  const dados = req.body;
-  let erros = [];
-
-  if (!dados.cnpj || dados.cnpj.trim() === "") {
-    erros.push("O campo CNPJ não foi preenchido");
+  if (url === "/" && metodo === "GET") {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.end(paginaHome());
+    return;
   }
 
-  if (!dados.razaoSocial || dados.razaoSocial.trim() === "") {
-    erros.push("O campo Razão Social ou Nome do Fornecedor não foi preenchido");
+  if (url === "/cliente" && metodo === "GET") {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.end(paginaCliente());
+    return;
   }
 
-  if (!dados.nomeFantasia || dados.nomeFantasia.trim() === "") {
-    erros.push("O campo Nome fantasia não foi preenchido");
+  if (url === "/login" && metodo === "GET") {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.end(paginaLogin());
+    return;
   }
 
-  if (!dados.endereco || dados.endereco.trim() === "") {
-    erros.push("O campo Endereço não foi preenchido");
+  if (url === "/login" && metodo === "POST") {
+    const dados = await parseBody(req);
+
+    if (dados.usuario === "admin" && dados.senha === "123") {
+      res.statusCode = 200;
+      res.setHeader("Set-Cookie", "logado=sim; Path=/");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.end(
+        paginaLogin({
+          tipo: "sucesso",
+          texto: "Login realizado com sucesso!"
+        })
+      );
+    } else {
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.end(
+        paginaLogin({
+          tipo: "erro",
+          texto: "Usuário ou senha inválidos!"
+        })
+      );
+    }
+    return;
   }
 
-  if (!dados.cidade || dados.cidade.trim() === "") {
-    erros.push("O campo Cidade não foi preenchido");
+  if (url === "/logout" && metodo === "GET") {
+    res.statusCode = 200;
+    res.setHeader("Set-Cookie", "logado=; Path=/; Max-Age=0");
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.end(
+      layout(
+        "Logout",
+        `
+          <h1>Logout</h1>
+          <p class="sucesso">Logout efetuado com sucesso!</p>
+        `
+      )
+    );
+    return;
   }
 
-  if (!dados.uf || dados.uf.trim() === "") {
-    erros.push("O campo UF não foi preenchido");
+  if (url === "/fornecedor" && metodo === "GET") {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+
+    if (cookies.logado !== "sim") {
+      res.end(
+        paginaFornecedor({
+          tipo: "erro",
+          texto: "Você pode cadastrar mesmo sem bloquear, mas o login/logout já está implementado."
+        })
+      );
+    } else {
+      res.end(paginaFornecedor());
+    }
+    return;
   }
 
-  if (!dados.cep || dados.cep.trim() === "") {
-    erros.push("O campo CEP não foi preenchido");
-  }
+  if (url === "/fornecedor" && metodo === "POST") {
+    const dados = await parseBody(req);
 
-  if (!dados.email || dados.email.trim() === "") {
-    erros.push("O campo Email não foi preenchido");
-  }
+    const campos = [
+      { nome: "cnpj", label: "CNPJ" },
+      { nome: "razaoSocial", label: "Razão Social ou Nome do Fornecedor" },
+      { nome: "nomeFantasia", label: "Nome Fantasia" },
+      { nome: "endereco", label: "Endereço" },
+      { nome: "cidade", label: "Cidade" },
+      { nome: "uf", label: "UF" },
+      { nome: "cep", label: "CEP" },
+      { nome: "email", label: "Email" },
+      { nome: "telefone", label: "Telefone" }
+    ];
 
-  if (!dados.telefone || dados.telefone.trim() === "") {
-    erros.push("O campo Telefone não foi preenchido");
-  }
+    const erros = [];
 
-  if (erros.length > 0) {
-    res.send(paginaCadastroFornecedor("Erro ao cadastrar", erros, dados));
-  } else {
-    fornecedores.push({
+    for (let i = 0; i < campos.length; i++) {
+      const valor = dados[campos[i].nome];
+
+      if (!valor || valor.trim() === "") {
+        erros.push(campos[i].label);
+      }
+    }
+
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+
+    if (erros.length > 0) {
+      res.end(
+        paginaFornecedor(
+          {
+            tipo: "erro",
+            texto: "Os seguintes campos são obrigatórios: " + erros.join(", ")
+          },
+          dados
+        )
+      );
+      return;
+    }
+
+    empresas.push({
       cnpj: dados.cnpj,
       razaoSocial: dados.razaoSocial,
       nomeFantasia: dados.nomeFantasia,
@@ -240,8 +397,24 @@ app.post("/cadastroFornecedor", function (req, res) {
       telefone: dados.telefone
     });
 
-    res.send(paginaCadastroFornecedor("Fornecedor cadastrado com sucesso", [], {}));
+    res.end(
+      paginaFornecedor({
+        tipo: "sucesso",
+        texto: "Fornecedor cadastrado com sucesso!"
+      })
+    );
+    return;
   }
-});
 
-module.exports = app;
+  res.statusCode = 404;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.end(
+    layout(
+      "Página não encontrada",
+      `
+        <h1>404</h1>
+        <p>Página não encontrada.</p>
+      `
+    )
+  );
+};
