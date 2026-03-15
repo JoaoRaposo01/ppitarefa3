@@ -1,0 +1,26 @@
+{
+  "name": "ppitarefa3",
+  "version": "1.0.0",
+  "description": "tarefa de ppi",
+  "keywords": [
+    "http",
+    "express",
+    "node",
+    "ppi"
+  ],
+  "homepage": "https://github.com/JoaoRaposo01/ppitarefa3#readme",
+  "bugs": {
+    "url": "https://github.com/JoaoRaposo01/ppitarefa3/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoaoRaposo01/ppitarefa3.git"
+  },
+  "license": "ISC",
+  "author": "João Pedro Campos Raposo",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
