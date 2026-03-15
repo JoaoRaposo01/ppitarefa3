@@ -1,7 +1,8 @@
-const http = require("http");
-const querystring = require("querystring");
+const express = require("express");
 
-const porta = 3000;
+const app = express();
+
+app.use(express.urlencoded({ extended: true }));
 
 let fornecedores = [];
 let logado = false;
@@ -68,8 +69,8 @@ function listaFornecedores() {
     for (let i = 0; i < fornecedores.length; i++) {
       lista += `
         <li>
-          ${fornecedores[i].cnpj} - 
-          ${fornecedores[i].razaoSocial} - 
+          ${fornecedores[i].cnpj} -
+          ${fornecedores[i].razaoSocial} -
           ${fornecedores[i].nomeFantasia}
         </li>
       `;
@@ -143,149 +144,104 @@ function paginaCadastroFornecedor(mensagem, erros, dados) {
   `;
 }
 
-const servidor = http.createServer(function (req, res) {
-  if (req.method === "GET" && req.url === "/") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(paginaHome());
-  }
+app.get("/", function (req, res) {
+  res.send(paginaHome());
+});
 
-  else if (req.method === "GET" && req.url === "/login") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(paginaLogin(""));
-  }
+app.get("/login", function (req, res) {
+  res.send(paginaLogin(""));
+});
 
-  else if (req.method === "POST" && req.url === "/login") {
-    let corpo = "";
+app.post("/login", function (req, res) {
+  const dados = req.body;
 
-    req.on("data", function (parte) {
-      corpo += parte;
-    });
-
-    req.on("end", function () {
-      const dados = querystring.parse(corpo);
-
-      if (dados.usuario === "admin" && dados.senha === "123") {
-        logado = true;
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(paginaLogin("Login realizado com sucesso"));
-      } else {
-        logado = false;
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(paginaLogin("Usuário ou senha inválidos"));
-      }
-    });
-  }
-
-  else if (req.method === "GET" && req.url === "/logout") {
+  if (dados.usuario === "admin" && dados.senha === "123") {
+    logado = true;
+    res.send(paginaLogin("Login realizado com sucesso"));
+  } else {
     logado = false;
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(`
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Logout</title>
-        </head>
-        <body>
-          ${menu()}
-          <h1>Logout</h1>
-          <p>Logout efetuado com sucesso!</p>
-        </body>
-      </html>
-    `);
-  }
-
-  else if (req.method === "GET" && req.url === "/cadastroFornecedor") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(paginaCadastroFornecedor("", [], {}));
-  }
-
-  else if (req.method === "POST" && req.url === "/cadastroFornecedor") {
-    let corpo = "";
-
-    req.on("data", function (parte) {
-      corpo += parte;
-    });
-
-    req.on("end", function () {
-      const dados = querystring.parse(corpo);
-      let erros = [];
-
-      if (!dados.cnpj || dados.cnpj.trim() === "") {
-        erros.push("O campo CNPJ não foi preenchido");
-      }
-
-      if (!dados.razaoSocial || dados.razaoSocial.trim() === "") {
-        erros.push("O campo Razão Social ou Nome do Fornecedor não foi preenchido");
-      }
-
-      if (!dados.nomeFantasia || dados.nomeFantasia.trim() === "") {
-        erros.push("O campo Nome fantasia não foi preenchido");
-      }
-
-      if (!dados.endereco || dados.endereco.trim() === "") {
-        erros.push("O campo Endereço não foi preenchido");
-      }
-
-      if (!dados.cidade || dados.cidade.trim() === "") {
-        erros.push("O campo Cidade não foi preenchido");
-      }
-
-      if (!dados.uf || dados.uf.trim() === "") {
-        erros.push("O campo UF não foi preenchido");
-      }
-
-      if (!dados.cep || dados.cep.trim() === "") {
-        erros.push("O campo CEP não foi preenchido");
-      }
-
-      if (!dados.email || dados.email.trim() === "") {
-        erros.push("O campo Email não foi preenchido");
-      }
-
-      if (!dados.telefone || dados.telefone.trim() === "") {
-        erros.push("O campo Telefone não foi preenchido");
-      }
-
-      if (erros.length > 0) {
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(paginaCadastroFornecedor("Erro ao cadastrar", erros, dados));
-      } else {
-        fornecedores.push({
-          cnpj: dados.cnpj,
-          razaoSocial: dados.razaoSocial,
-          nomeFantasia: dados.nomeFantasia,
-          endereco: dados.endereco,
-          cidade: dados.cidade,
-          uf: dados.uf,
-          cep: dados.cep,
-          email: dados.email,
-          telefone: dados.telefone
-        });
-
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(paginaCadastroFornecedor("Fornecedor cadastrado com sucesso", [], {}));
-      }
-    });
-  }
-
-  else {
-    res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(`
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Erro</title>
-        </head>
-        <body>
-          ${menu()}
-          <h1>404</h1>
-          <p>Página não encontrada</p>
-        </body>
-      </html>
-    `);
+    res.send(paginaLogin("Usuário ou senha inválidos"));
   }
 });
 
-servidor.listen(porta, function () {
-  console.log("Servidor rodando em http://localhost:" + porta);
+app.get("/logout", function (req, res) {
+  logado = false;
+  res.send(`
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Logout</title>
+      </head>
+      <body>
+        ${menu()}
+        <h1>Logout</h1>
+        <p>Logout efetuado com sucesso!</p>
+      </body>
+    </html>
+  `);
 });
+
+app.get("/cadastroFornecedor", function (req, res) {
+  res.send(paginaCadastroFornecedor("", [], {}));
+});
+
+app.post("/cadastroFornecedor", function (req, res) {
+  const dados = req.body;
+  let erros = [];
+
+  if (!dados.cnpj || dados.cnpj.trim() === "") {
+    erros.push("O campo CNPJ não foi preenchido");
+  }
+
+  if (!dados.razaoSocial || dados.razaoSocial.trim() === "") {
+    erros.push("O campo Razão Social ou Nome do Fornecedor não foi preenchido");
+  }
+
+  if (!dados.nomeFantasia || dados.nomeFantasia.trim() === "") {
+    erros.push("O campo Nome fantasia não foi preenchido");
+  }
+
+  if (!dados.endereco || dados.endereco.trim() === "") {
+    erros.push("O campo Endereço não foi preenchido");
+  }
+
+  if (!dados.cidade || dados.cidade.trim() === "") {
+    erros.push("O campo Cidade não foi preenchido");
+  }
+
+  if (!dados.uf || dados.uf.trim() === "") {
+    erros.push("O campo UF não foi preenchido");
+  }
+
+  if (!dados.cep || dados.cep.trim() === "") {
+    erros.push("O campo CEP não foi preenchido");
+  }
+
+  if (!dados.email || dados.email.trim() === "") {
+    erros.push("O campo Email não foi preenchido");
+  }
+
+  if (!dados.telefone || dados.telefone.trim() === "") {
+    erros.push("O campo Telefone não foi preenchido");
+  }
+
+  if (erros.length > 0) {
+    res.send(paginaCadastroFornecedor("Erro ao cadastrar", erros, dados));
+  } else {
+    fornecedores.push({
+      cnpj: dados.cnpj,
+      razaoSocial: dados.razaoSocial,
+      nomeFantasia: dados.nomeFantasia,
+      endereco: dados.endereco,
+      cidade: dados.cidade,
+      uf: dados.uf,
+      cep: dados.cep,
+      email: dados.email,
+      telefone: dados.telefone
+    });
+
+    res.send(paginaCadastroFornecedor("Fornecedor cadastrado com sucesso", [], {}));
+  }
+});
+
+module.exports = app;
